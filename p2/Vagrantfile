@@ -1,0 +1,37 @@
+# Part 2: Single VM with K3s server + 3 apps + Ingress
+# Box: cloudicio/ubuntu-server (has both arm64 and amd64 VirtualBox images)
+# https://portal.cloud.hashicorp.com/vagrant/discover/cloudicio/ubuntu-server
+
+# "2" = Vagrantfile format version (always "2" for modern Vagrant)
+Vagrant.configure("2") do |config|
+
+  # Define a single VM named "msousaS" (42 login + S, as required by subject)
+  config.vm.define "msousaS" do |node|
+
+    # Which OS image to download and use for this VM
+    node.vm.box = "cloudicio/ubuntu-server"
+
+    # Set the VM's hostname (visible inside the VM via `hostname` command)
+    node.vm.hostname = "msousaS"
+
+    # Create a private (host-only) network interface with this static IP.
+    # This lets your Mac reach the VM at 192.168.56.110, and lets the VM
+    # be accessible for curl/kubectl from the host.
+    node.vm.network :private_network, ip: "192.168.56.110"
+
+    # Map the current directory (p2/) on your Mac to /vagrant inside the VM.
+    # This is how the VM accesses confs/apps.yaml, confs/ingress.yaml, and
+    # how the kubeconfig (k3s.yaml) gets copied back to the host.
+    node.vm.synced_folder ".", "/vagrant"
+
+    # Run this script inside the VM after first boot (provisioning).
+    # This installs K3s, waits for Traefik, and deploys the apps.
+    node.vm.provision :shell, path: "scripts/bootstrap.sh"
+  end
+
+  # VirtualBox-specific settings (applied to all VMs in this Vagrantfile)
+  config.vm.provider :virtualbox do |v|
+    v.memory = 1024  # 1 GB RAM
+    v.cpus = 1       # 1 CPU core
+  end
+end

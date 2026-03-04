@@ -1,0 +1,54 @@
+# An Ingress defines HTTP routing rules: "if the request has Host header X,
+# send it to Service Y." It's just the rules — the actual routing is done
+# by the Ingress Controller (Traefik, which K3s runs automatically).
+#
+# Traffic flow:
+#   curl from Mac -> VM IP:80 -> Traefik (reads Ingress rules) -> Service -> Pod
+
+apiVersion: networking.k8s.io/v1  # API group for networking resources
+kind: Ingress                      # Resource type
+metadata:
+  name: app-ingress                # Name of this Ingress resource
+spec:
+  # Which Ingress Controller should handle these rules.
+  # "traefik" = K3s's built-in controller. If omitted, Traefik would still
+  # pick it up (it's the only controller), but being explicit is best practice.
+  ingressClassName: traefik
+
+  rules:
+    # Rule 1: requests with "Host: app1.com" header go to app-one
+    - host: app1.com
+      http:
+        paths:
+          - path: /                # Match all paths (/)
+            pathType: Prefix       # "Prefix" = match this path and anything under it
+            backend:
+              service:
+                name: app-one      # Forward to the Service named "app-one"
+                port:
+                  number: 80       # Connect to port 80 on the Service
+
+    # Rule 2: requests with "Host: app2.com" header go to app-two
+    - host: app2.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-two      # This Service load-balances across 3 replicas
+                port:
+                  number: 80
+
+    # Rule 3: NO host field = catch-all / default rule.
+    # Any request that doesn't match app1.com or app2.com lands here.
+    # This is why `curl http://192.168.56.110` (no Host header) returns app-three.
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app-three
+                port:
+                  number: 80

@@ -1,0 +1,19 @@
+# IoT Application Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iot-app-ingress
+  namespace: dev
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: iot-app-service
+                port:
+                  number: 8888

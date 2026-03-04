@@ -1,0 +1,27 @@
+# IoT Application Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: iot-app-service
+  namespace: dev
+  labels:
+    app: iot-app
+    project: inception-of-things
+spec:
+  selector:
+    app: iot-app
+
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8888
+    targetPort: 8888
+
+  type: ClusterIP
+  sessionAffinity: None
+
+---
+# Access methods:
+# - Within cluster: curl http://iot-app-service:8888/
+# - Port forward: kubectl port-forward -n dev svc/iot-app-service 8888:8888
+# - Ingress using http://iot-app-service:8080/

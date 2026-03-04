@@ -1,0 +1,153 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# APP ONE — Deployment + Service
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# A Deployment tells Kubernetes: "Run N copies of this container and keep them
+# alive." If a pod crashes, the Deployment automatically creates a replacement.
+# You never create pods directly — you create a Deployment and it manages them.
+apiVersion: apps/v1       # API group and version for Deployments
+kind: Deployment          # Resource type
+metadata:
+  name: app-one           # Name of this Deployment (used by kubectl, logs, etc.)
+spec:
+  replicas: 1             # Run 1 copy (1 pod) of this app
+
+  # Selector: how the Deployment finds which pods belong to it.
+  # It looks for pods with the label "app: app-one".
+  # This MUST match the labels in template.metadata.labels below.
+  selector:
+    matchLabels:
+      app: app-one
+
+  # Template: the blueprint for each pod this Deployment creates.
+  template:
+    metadata:
+      labels:
+        app: app-one      # Label on each pod (must match selector above)
+    spec:
+      containers:
+      - name: echo        # Container name (arbitrary, for logs/debugging)
+
+        # hashicorp/http-echo: a minimal web server that returns text.
+        # Multi-arch image (works on both amd64 and arm64).
+        # https://hub.docker.com/r/hashicorp/http-echo
+        image: hashicorp/http-echo
+
+        # Args passed to the http-echo binary inside the container:
+        #   -text: the text to return on every HTTP request
+        #   -listen: which port to listen on inside the container
+        args:
+          - "-text=Hello from app one"
+          - "-listen=:8080"
+
+        ports:
+        - containerPort: 8080  # Tells K8s this container listens on port 8080
+
+---
+# A Service gives a stable network address to a set of pods. Pods are
+# ephemeral (they get new IPs when recreated), but a Service provides a
+# fixed internal address that always routes to the healthy pods behind it.
+#
+# Without a Service, the Ingress couldn't reach the pods — it wouldn't know
+# their ever-changing IPs. The Service acts as a stable middleman.
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-one           # Service name. The Ingress references this name.
+spec:
+  # Selector: which pods does this Service route traffic to?
+  # Pods with label "app: app-one" (same label as the Deployment's pods).
+  selector:
+    app: app-one
+
+  ports:
+  - port: 80              # Port the SERVICE listens on (what Ingress connects to)
+    targetPort: 8080      # Port on the POD to forward to (where http-echo listens)
+    # So: Ingress -> Service:80 -> Pod:8080
+    # The Service translates between these two ports.
+
+  # ClusterIP = only reachable from inside the cluster. External traffic
+  # can't hit this directly — that's what the Ingress is for.
+  type: ClusterIP
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# APP TWO — Deployment + Service (3 replicas as required by subject)
+# ═══════════════════════════════════════════════════════════════════════════════
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-two
+spec:
+  replicas: 3             # 3 copies of this app (subject requirement).
+                          # kubectl get pods will show 3 pods for app-two.
+                          # The Service load-balances across all 3.
+  selector:
+    matchLabels:
+      app: app-two
+  template:
+    metadata:
+      labels:
+        app: app-two
+    spec:
+      containers:
+      - name: echo
+        image: hashicorp/http-echo
+        args:
+          - "-text=Hello from app two"
+          - "-listen=:8080"
+        ports:
+        - containerPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-two
+spec:
+  selector:
+    app: app-two          # Routes to ALL pods with this label (all 3 replicas)
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# APP THREE — Deployment + Service (default/catch-all app)
+# ═══════════════════════════════════════════════════════════════════════════════
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-three
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-three
+  template:
+    metadata:
+      labels:
+        app: app-three
+    spec:
+      containers:
+      - name: echo
+        image: hashicorp/http-echo
+        args:
+          - "-text=Hello from app three"
+          - "-listen=:8080"
+        ports:
+        - containerPort: 8080
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-three
+spec:
+  selector:
+    app: app-three
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
